@@ -4,8 +4,8 @@ import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Intersector;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -17,49 +17,26 @@ public class GameScreen implements Screen {
     SpriteBatch batch;
     BitmapFont font;
     ShapeRenderer shapeRenderer;
-    Texture fondo1, fondo2, fondo3, jugadorTexture, portal, portal2;
-    Texture rancorDerecha, rancorIzquierda, rancorMuertoTexture;
-    Texture rancorActual;
+
+    Texture fondo1, fondo2, fondo3;
+    Texture portal, portal2;
     Texture disparoTexture;
-    boolean jugadorYaGolpeadoPorRancor = false;
-    float tiempoDesdeUltimoGolpe = 0f;
 
-
-
-    String rutaActual = "jade_normal.png";
-    boolean salaA = true;
-    boolean salaB = false;
-
-    float silasX = 100, silasY = 100;
-    float speed = 200;
-
-    float elapsedTime = 0f;
-    float animTimerFondo = 0f;
-    float animTimerSprite = 0f;
-    float animTimerPortal = 0f;
-    boolean usarFondo1 = true;
-    boolean usarPortal1 = true;
-    boolean mostrarMensaje = true;
-    int frame = 0;
-
+    Jugador jugador;
+    Enemigo rancor;
     Array<Polygon> paredes;
     Array<Polygon> columnas;
     Array<Disparo> disparos;
 
-    float rancorX = 600, rancorY = 100;
-    float velocidadRancor = 60f;
+    boolean salaA = true;
+    boolean salaB = false;
 
-    int vidaJugador = 100;
-    int vidaRancor = 150;
-    int ataqueJugador = 10;
-
-    float tiempoMuerte = 0f;
-    float parpadeoTimer = 0f;
-    boolean rancorMuerto = false;
-    boolean rancorParpadeando = false;
-    boolean rancorVisible = true;
-
-    String direccion = "right";
+    float elapsedTime = 0f;
+    float animTimerFondo = 0f;
+    float animTimerPortal = 0f;
+    boolean usarFondo1 = true;
+    boolean usarPortal1 = true;
+    boolean mostrarMensaje = true;
 
     public GameScreen(Main game) {
         this.game = game;
@@ -77,18 +54,18 @@ public class GameScreen implements Screen {
         fondo3 = new Texture("dungeon_b1.png");
         portal = new Texture("canvas.png");
         portal2 = new Texture("canvas_invertido.png");
-        jugadorTexture = new Texture(rutaActual);
-
-        rancorDerecha = new Texture("rancor_right.png");
-        rancorIzquierda = new Texture("rancor_left.png");
-        rancorMuertoTexture = new Texture("rancor_dead.png");
-        rancorActual = rancorDerecha;
-
         disparoTexture = new Texture("fuegoPistola.png");
-        disparos = new Array<>();
+
+        jugador = new Jugador(100, 100, 200, 100, new Texture("jade_normal.png"));
+        rancor = new Enemigo(600, 100, 60, 150,
+            new Texture("rancor_right.png"),
+            new Texture("rancor_left.png"),
+            new Texture("rancor_dead.png")
+        );
 
         paredes = new Array<>();
         columnas = new Array<>();
+        disparos = new Array<>();
 
         paredes.addAll(
             new Polygon(new float[]{104, 545, 768, 545, 768, 545, 0, 545}),
@@ -108,20 +85,26 @@ public class GameScreen implements Screen {
     public void render(float delta) {
         elapsedTime += delta;
         animTimerFondo += delta;
-        animTimerSprite += delta;
         animTimerPortal += delta;
+        jugador.actualizarAnimacion(delta);
+        jugador.incrementarTiempoGolpe(delta);
 
         ScreenUtils.clear(Color.BLACK);
-        tiempoDesdeUltimoGolpe += delta;
         batch.begin();
 
         if (mostrarMensaje) {
-            font.draw(batch, "LOADING...", 250, 300);
-            if (elapsedTime > 0.8f) {
+            Texture loadingFondo = new Texture("dungeon_loading.png");
+            batch.draw(loadingFondo, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+            font.draw(batch, "CARGANDO...", 300, 50);
+            if (elapsedTime > 1.5f) {
                 mostrarMensaje = false;
                 elapsedTime = 0f;
+                loadingFondo.dispose(); // libera memoria
             }
-        } else {
+            batch.end();
+            return;
+        }
+        else {
             if (animTimerFondo >= 0.1f) {
                 usarFondo1 = !usarFondo1;
                 if (salaA) usarPortal1 = !usarPortal1;
@@ -136,25 +119,25 @@ public class GameScreen implements Screen {
                 batch.draw(portalActual, 290, 520, 180, 180);
             }
 
-            float dx = 0, dy = 0;
-            boolean moviendo = false;
+            jugador.procesarEntrada(delta);
 
-            if (Gdx.input.isKeyPressed(Input.Keys.W)) { dy += speed * delta; direccion = "up"; moviendo = true; }
-            if (Gdx.input.isKeyPressed(Input.Keys.S)) { dy -= speed * delta; direccion = "down"; moviendo = true; }
-            if (Gdx.input.isKeyPressed(Input.Keys.A)) { dx -= speed * delta; direccion = "left"; moviendo = true; }
-            if (Gdx.input.isKeyPressed(Input.Keys.D)) { dx += speed * delta; direccion = "right"; moviendo = true; }
+            Polygon futura = jugador.getPoligonoFuturo();
+            boolean colision = false;
+            for (Polygon p : paredes) if (Intersector.overlapConvexPolygons(futura, p)) colision = true;
+            for (Polygon p : columnas) if (Intersector.overlapConvexPolygons(futura, p)) colision = true;
+            if (!colision) jugador.mover();
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
-                disparos.add(new Disparo(silasX + 50, silasY + 40, direccion));
+                disparos.add(new Disparo(jugador.getX() + 50, jugador.getY() + 40, jugador.getDireccion()));
             }
 
-            for (Iterator<Disparo> it = disparos.iterator(); it.hasNext(); ) {
+            for (Iterator<Disparo> it = disparos.iterator(); it.hasNext();) {
                 Disparo d = it.next();
                 d.actualizar(delta);
                 batch.draw(disparoTexture, d.x, d.y, 8, 8);
-                Rectangle hitRancor = new Rectangle(rancorX, rancorY, 64, 64);
+                Rectangle hitRancor = new Rectangle(rancor.getX(), rancor.getY(), rancor.getWidth(), rancor.getHeight());
                 if (salaB && new Rectangle(d.x, d.y, d.ancho, d.alto).overlaps(hitRancor)) {
-                    vidaRancor -= ataqueJugador;
+                    rancor.recibirDanio(jugador.getAtaque());
                     it.remove();
                 }
                 if (d.x < 0 || d.x > 800 || d.y < 0 || d.y > 600) {
@@ -162,90 +145,31 @@ public class GameScreen implements Screen {
                 }
             }
 
-            Polygon futura = new Polygon(new float[]{
-                silasX + dx, silasY + dy,
-                silasX + dx + 64, silasY + dy,
-                silasX + dx + 64, silasY + dy + 64,
-                silasX + dx, silasY + dy + 64
-            });
-
-            boolean colision = false;
-            for (Polygon p : paredes) if (Intersector.overlapConvexPolygons(futura, p)) colision = true;
-            for (Polygon p : columnas) if (Intersector.overlapConvexPolygons(futura, p)) colision = true;
-
-            if (!colision) { silasX += dx; silasY += dy; }
-
-            if (moviendo && animTimerSprite >= 0.1f) {
-                frame = 1 - frame;
-                String nuevaRuta = "jade_" + direccion + ".png";
-                if (!nuevaRuta.equals(rutaActual)) {
-                    rutaActual = nuevaRuta;
-                    jugadorTexture.dispose();
-                    jugadorTexture = new Texture(rutaActual);
-                }
-                animTimerSprite = 0f;
-            }
-
-            if (!moviendo && !rutaActual.equals("jade_normal.png")) {
-                rutaActual = "jade_normal.png";
-                jugadorTexture.dispose();
-                jugadorTexture = new Texture(rutaActual);
-                animTimerSprite = 0f;
-            }
-
-            batch.draw(jugadorTexture, silasX, silasY, 100, 100);
+            jugador.dibujar(batch);
 
             if (salaB) {
-                Rectangle hitJugador = new Rectangle(silasX, silasY, 64, 64);
-                Rectangle hitRancor = new Rectangle(rancorX, rancorY, 64, 64);
+                Rectangle hitJugador = jugador.getRectangulo();
+                Rectangle hitRancor = new Rectangle(rancor.getX(), rancor.getY(), rancor.getWidth(), rancor.getHeight());
 
-                if (vidaRancor > 0) {
-                    float dxR = silasX - rancorX;
-                    float dyR = silasY - rancorY;
-                    float dist = (float)Math.sqrt(dxR * dxR + dyR * dyR);
-                    if (dist > 1) {
-                        rancorX += (dxR / dist) * velocidadRancor * delta;
-                        rancorY += (dyR / dist) * velocidadRancor * delta;
+                if (!rancor.estaMuerto()) {
+                    rancor.seguir(jugador.getX(), jugador.getY(), delta);
+                    rancor.dibujar(batch);
+                    if (hitJugador.overlaps(hitRancor)) {
+                        if (jugador.puedeSerGolpeado()) {
+                            jugador.recibirDanio(rancor.getAtaque());
+                        }
                     }
-                    rancorActual = dxR > 0 ? rancorDerecha : rancorIzquierda;
-                    batch.draw(rancorActual, rancorX, rancorY, 100, 100);
-
-                    if (hitJugador.overlaps(hitRancor) && tiempoDesdeUltimoGolpe >= 1f) {
-                        vidaJugador -= 50;
-                        if (vidaJugador < 0) vidaJugador = 0;
-                        tiempoDesdeUltimoGolpe = 0f;
-                    }
-
-
-
-
                 } else {
-                    if (!rancorMuerto) {
-                        rancorParpadeando = true;
-                        tiempoMuerte += delta;
-                        parpadeoTimer += delta;
-
-                        if (parpadeoTimer >= 0.2f) {
-                            rancorVisible = !rancorVisible;
-                            parpadeoTimer = 0f;
-                        }
-
-                        if (tiempoMuerte >= 3f) {
-                            rancorMuerto = true;
-                            rancorParpadeando = false;
-                        }
-
-                        if (rancorVisible) {
-                            batch.draw(rancorActual, rancorX, rancorY, 100, 100);
-                        }
+                    if (!rancor.estaMuertoDelTodo()) {
+                        rancor.animacionMuerte(batch, delta);
                     } else {
-                        batch.draw(rancorMuertoTexture, rancorX, rancorY, 100, 100);
+                        rancor.dibujar(batch);
                     }
                 }
             }
 
             if (salaA) {
-                Rectangle hitboxJugador = new Rectangle(silasX, silasY, 64, 64);
+                Rectangle hitboxJugador = jugador.getRectangulo();
                 Rectangle portalRect = new Rectangle(290, 520, 180, 180);
                 if (portalRect.overlaps(hitboxJugador)) {
                     salaA = false;
@@ -266,19 +190,15 @@ public class GameScreen implements Screen {
             }
         }
         batch.end();
-        if (vidaJugador <= 0) {
+
+        if (jugador.getVida() <= 0) {
             game.setScreen(new GameOverScreen(game));
             return;
         }
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(Color.DARK_GRAY);
-        shapeRenderer.rect(20, 20, 200, 20);
-        shapeRenderer.rect(580, 20, 200, 20);
-        shapeRenderer.setColor(Color.RED);
-        shapeRenderer.rect(20, 20, Math.max(0, vidaJugador * 2), 20);
-        shapeRenderer.setColor(Color.PURPLE);
-        shapeRenderer.rect(580, 20, Math.max(0, vidaRancor * 2 / 1.5f), 20);
+        new BarraVida(jugador.getVida(), jugador.getMaxVida(), 20, 20, 200, 20, Color.RED).dibujar(shapeRenderer);
+        new BarraVida(rancor.getVida(), rancor.getMaxVida(), 580, 20, 200, 20, Color.PURPLE).dibujar(shapeRenderer);
         shapeRenderer.end();
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
@@ -301,10 +221,8 @@ public class GameScreen implements Screen {
         fondo1.dispose();
         fondo2.dispose();
         fondo3.dispose();
-        jugadorTexture.dispose();
-        rancorDerecha.dispose();
-        rancorIzquierda.dispose();
-        rancorMuertoTexture.dispose();
+        jugador.dispose();
+        rancor.dispose();
         disparoTexture.dispose();
         if (portal != null) portal.dispose();
         if (portal2 != null) portal2.dispose();
