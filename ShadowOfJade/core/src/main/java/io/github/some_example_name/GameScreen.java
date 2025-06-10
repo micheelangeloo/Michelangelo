@@ -18,7 +18,7 @@ public class GameScreen implements Screen {
     BitmapFont font;
     ShapeRenderer shapeRenderer;
 
-    Texture fondo1, fondo2, fondo3;
+    Texture fondo1, fondo2, fondo3, fondoFinal;
     Texture portal, portal2;
     Texture disparoTexture;
 
@@ -30,6 +30,7 @@ public class GameScreen implements Screen {
 
     boolean salaA = true;
     boolean salaB = false;
+    boolean salaFinal = false;
 
     float elapsedTime = 0f;
     float animTimerFondo = 0f;
@@ -52,6 +53,7 @@ public class GameScreen implements Screen {
         fondo1 = new Texture("dungeon1.png");
         fondo2 = new Texture("dungeon2.png");
         fondo3 = new Texture("dungeon_b1.png");
+        fondoFinal = new Texture("dungeon_final.png");
         portal = new Texture("canvas.png");
         portal2 = new Texture("canvas_invertido.png");
         disparoTexture = new Texture("fuegoPistola.png");
@@ -92,103 +94,102 @@ public class GameScreen implements Screen {
         ScreenUtils.clear(Color.BLACK);
         batch.begin();
 
-        if (mostrarMensaje) {
-            Texture loadingFondo = new Texture("dungeon_loading.png");
-            batch.draw(loadingFondo, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-            font.draw(batch, "CARGANDO...", 300, 50);
-            if (elapsedTime > 1.5f) {
-                mostrarMensaje = false;
-                elapsedTime = 0f;
-                loadingFondo.dispose(); // libera memoria
-            }
-            batch.end();
-            return;
-        }
-        else {
-            if (animTimerFondo >= 0.1f) {
+        if (salaA || salaB) {
+            if (animTimerFondo >= 0.2f) {
                 usarFondo1 = !usarFondo1;
-                if (salaA) usarPortal1 = !usarPortal1;
                 animTimerFondo = 0f;
             }
-
-            Texture fondoActual = usarFondo1 ? fondo1 : fondo2;
-            batch.draw(fondoActual, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-
-            if (salaA) {
-                Texture portalActual = usarPortal1 ? portal : portal2;
-                batch.draw(portalActual, 290, 520, 180, 180);
-            }
-
-            jugador.procesarEntrada(delta);
-
-            Polygon futura = jugador.getPoligonoFuturo();
-            boolean colision = false;
-            for (Polygon p : paredes) if (Intersector.overlapConvexPolygons(futura, p)) colision = true;
-            for (Polygon p : columnas) if (Intersector.overlapConvexPolygons(futura, p)) colision = true;
-            if (!colision) jugador.mover();
-
-            if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
-                disparos.add(new Disparo(jugador.getX() + 50, jugador.getY() + 40, jugador.getDireccion()));
-            }
-
-            for (Iterator<Disparo> it = disparos.iterator(); it.hasNext();) {
-                Disparo d = it.next();
-                d.actualizar(delta);
-                batch.draw(disparoTexture, d.x, d.y, 8, 8);
-                Rectangle hitRancor = new Rectangle(rancor.getX(), rancor.getY(), rancor.getWidth(), rancor.getHeight());
-                if (salaB && new Rectangle(d.x, d.y, d.ancho, d.alto).overlaps(hitRancor)) {
-                    rancor.recibirDanio(jugador.getAtaque());
-                    it.remove();
-                }
-                if (d.x < 0 || d.x > 800 || d.y < 0 || d.y > 600) {
-                    it.remove();
-                }
-            }
-
-            jugador.dibujar(batch);
-
-            if (salaB) {
-                Rectangle hitJugador = jugador.getRectangulo();
-                Rectangle hitRancor = new Rectangle(rancor.getX(), rancor.getY(), rancor.getWidth(), rancor.getHeight());
-
-                if (!rancor.estaMuerto()) {
-                    rancor.seguir(jugador.getX(), jugador.getY(), delta);
-                    rancor.dibujar(batch);
-                    if (hitJugador.overlaps(hitRancor)) {
-                        if (jugador.puedeSerGolpeado()) {
-                            jugador.recibirDanio(rancor.getAtaque());
-                        }
-                    }
-                } else {
-                    if (!rancor.estaMuertoDelTodo()) {
-                        rancor.animacionMuerte(batch, delta);
-                    } else {
-                        rancor.dibujar(batch);
-                    }
-                }
-            }
-
-            if (salaA) {
-                Rectangle hitboxJugador = jugador.getRectangulo();
-                Rectangle portalRect = new Rectangle(290, 520, 180, 180);
-                if (portalRect.overlaps(hitboxJugador)) {
-                    salaA = false;
-                    salaB = true;
-                    fondo1 = fondo3;
-                    fondo2 = fondo3;
-                    portal = null;
-                    portal2 = null;
-                    paredes.clear();
-                    columnas.clear();
-                    paredes.addAll(
-                        new Polygon(new float[]{104, 545, 768, 545, 768, 545, 0, 545}),
-                        new Polygon(new float[]{0, 0, 768, 0, 768, 0, 0, 0}),
-                        new Polygon(new float[]{0, 64, 0, 64, 80, 545, 80, 545}),
-                        new Polygon(new float[]{768, 64, 768, 64, 690, 545, 690, 545})
-                    );
-                }
+            if (animTimerPortal >= 0.2f) {
+                usarPortal1 = !usarPortal1;
+                animTimerPortal = 0f;
             }
         }
+
+        Texture fondoActual = salaFinal ? fondoFinal : (usarFondo1 ? fondo1 : fondo2);
+        batch.draw(fondoActual, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+
+        if (salaA && portal != null && portal2 != null) {
+            Texture portalActual = usarPortal1 ? portal : portal2;
+            batch.draw(portalActual, 290, 520, 180, 180);
+        }
+
+        jugador.procesarEntrada(delta);
+
+        Polygon futura = jugador.getPoligonoFuturo();
+        boolean colision = false;
+        for (Polygon p : paredes) if (Intersector.overlapConvexPolygons(futura, p)) colision = true;
+        for (Polygon p : columnas) if (Intersector.overlapConvexPolygons(futura, p)) colision = true;
+        if (!colision) jugador.mover();
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+            disparos.add(new Disparo(jugador.getX() + 50, jugador.getY() + 40, jugador.getDireccion()));
+        }
+
+        for (Iterator<Disparo> it = disparos.iterator(); it.hasNext();) {
+            Disparo d = it.next();
+            d.actualizar(delta);
+            batch.draw(disparoTexture, d.x, d.y, 8, 8);
+            Rectangle hitRancor = new Rectangle(rancor.getX(), rancor.getY(), rancor.getWidth(), rancor.getHeight());
+            if (salaB && new Rectangle(d.x, d.y, d.ancho, d.alto).overlaps(hitRancor)) {
+                rancor.recibirDanio(jugador.getAtaque());
+                it.remove();
+            }
+            if (d.x < 0 || d.x > 800 || d.y < 0 || d.y > 600) {
+                it.remove();
+            }
+        }
+
+        jugador.dibujar(batch);
+
+        if (salaB) {
+            Rectangle hitJugador = jugador.getRectangulo();
+            Rectangle hitRancor = new Rectangle(rancor.getX(), rancor.getY(), rancor.getWidth(), rancor.getHeight());
+
+            if (!rancor.estaMuerto()) {
+                rancor.seguir(jugador.getX(), jugador.getY(), delta);
+                rancor.dibujar(batch);
+                if (hitJugador.overlaps(hitRancor)) {
+                    if (jugador.puedeSerGolpeado()) {
+                        jugador.recibirDanio(rancor.getAtaque());
+                    }
+                }
+            } else {
+                if (!rancor.estaMuertoDelTodo()) {
+                    rancor.animacionMuerte(batch, delta);
+                } else {
+                    rancor.dibujar(batch);
+                }
+            }
+
+            if (jugador.getX() > 350 && jugador.getY() > 350 && rancor.estaMuertoDelTodo()) {
+                salaB = false;
+                salaFinal = true;
+                fondo1 = fondoFinal;
+                fondo2 = fondoFinal;
+            }
+        }
+
+        if (salaA) {
+            Rectangle hitboxJugador = jugador.getRectangulo();
+            Rectangle portalRect = new Rectangle(290, 520, 180, 180);
+            if (portalRect.overlaps(hitboxJugador)) {
+                salaA = false;
+                salaB = true;
+                fondo1 = fondo3;
+                fondo2 = fondo3;
+                portal = null;
+                portal2 = null;
+                paredes.clear();
+                columnas.clear();
+                paredes.addAll(
+                    new Polygon(new float[]{104, 545, 768, 545, 768, 545, 0, 545}),
+                    new Polygon(new float[]{0, 0, 768, 0, 768, 0, 0, 0}),
+                    new Polygon(new float[]{0, 64, 0, 64, 80, 545, 80, 545}),
+                    new Polygon(new float[]{768, 64, 768, 64, 690, 545, 690, 545})
+                );
+            }
+        }
+
         batch.end();
 
         if (jugador.getVida() <= 0) {
@@ -221,6 +222,7 @@ public class GameScreen implements Screen {
         fondo1.dispose();
         fondo2.dispose();
         fondo3.dispose();
+        fondoFinal.dispose();
         jugador.dispose();
         rancor.dispose();
         disparoTexture.dispose();
