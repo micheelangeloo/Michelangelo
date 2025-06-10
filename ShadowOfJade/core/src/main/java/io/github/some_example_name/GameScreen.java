@@ -21,6 +21,7 @@ public class GameScreen implements Screen {
     Texture fondo1, fondo2, fondo3, fondoFinal;
     Texture portal, portal2;
     Texture disparoTexture;
+    Texture loadingTexture;
 
     Jugador jugador;
     Enemigo rancor;
@@ -54,6 +55,7 @@ public class GameScreen implements Screen {
         fondo2 = new Texture("dungeon2.png");
         fondo3 = new Texture("dungeon_b1.png");
         fondoFinal = new Texture("dungeon_final.png");
+        loadingTexture = new Texture("dungeon_loading.png");
         portal = new Texture("canvas.png");
         portal2 = new Texture("canvas_invertido.png");
         disparoTexture = new Texture("fuegoPistola.png");
@@ -93,6 +95,17 @@ public class GameScreen implements Screen {
 
         ScreenUtils.clear(Color.BLACK);
         batch.begin();
+
+        if (mostrarMensaje) {
+            batch.draw(loadingTexture, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+            font.draw(batch, "CARGANDO...", 300, 50);
+            if (elapsedTime > 1.5f) {
+                mostrarMensaje = false;
+                elapsedTime = 0f;
+            }
+            batch.end();
+            return;
+        }
 
         if (salaA || salaB) {
             if (animTimerFondo >= 0.2f) {
@@ -161,7 +174,7 @@ public class GameScreen implements Screen {
                 }
             }
 
-            if (jugador.getX() > 350 && jugador.getY() > 350 && rancor.estaMuertoDelTodo()) {
+            if (jugador.getX() > 540 && jugador.getY() > 430 && rancor.estaMuertoDelTodo()) {
                 salaB = false;
                 salaFinal = true;
                 fondo1 = fondoFinal;
@@ -177,8 +190,8 @@ public class GameScreen implements Screen {
                 salaB = true;
                 fondo1 = fondo3;
                 fondo2 = fondo3;
-                portal = null;
-                portal2 = null;
+                //portal = null;
+                //portal2 = null;
                 paredes.clear();
                 columnas.clear();
                 paredes.addAll(
@@ -223,6 +236,7 @@ public class GameScreen implements Screen {
         fondo2.dispose();
         fondo3.dispose();
         fondoFinal.dispose();
+        loadingTexture.dispose();
         jugador.dispose();
         rancor.dispose();
         disparoTexture.dispose();
