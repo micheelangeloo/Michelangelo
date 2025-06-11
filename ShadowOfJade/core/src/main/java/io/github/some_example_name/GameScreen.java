@@ -25,6 +25,7 @@ public class GameScreen implements Screen {
 
     Jugador jugador;
     Enemigo rancor;
+    EnemigoFinal dragon;
     Array<Polygon> paredes;
     Array<Polygon> columnas;
     Array<Disparo> disparos;
@@ -60,8 +61,8 @@ public class GameScreen implements Screen {
         portal2 = new Texture("canvas_invertido.png");
         disparoTexture = new Texture("fuegoPistola.png");
 
-        jugador = new Jugador(100, 100, 200, 100, new Texture("jade_normal.png"));
-        rancor = new Enemigo(600, 100, 60, 150,
+        jugador = new Jugador(100, 100, 300, 100, new Texture("jade_normal.png"));
+        rancor = new Enemigo(600, 100, 90, 150,
             new Texture("rancor_right.png"),
             new Texture("rancor_left.png"),
             new Texture("rancor_dead.png")
@@ -121,7 +122,7 @@ public class GameScreen implements Screen {
         Texture fondoActual = salaFinal ? fondoFinal : (usarFondo1 ? fondo1 : fondo2);
         batch.draw(fondoActual, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 
-        if (salaA && portal != null && portal2 != null) {
+        if (salaA) {
             Texture portalActual = usarPortal1 ? portal : portal2;
             batch.draw(portalActual, 290, 520, 180, 180);
         }
@@ -141,18 +142,50 @@ public class GameScreen implements Screen {
         for (Iterator<Disparo> it = disparos.iterator(); it.hasNext();) {
             Disparo d = it.next();
             d.actualizar(delta);
-            batch.draw(disparoTexture, d.x, d.y, 8, 8);
-            Rectangle hitRancor = new Rectangle(rancor.getX(), rancor.getY(), rancor.getWidth(), rancor.getHeight());
-            if (salaB && new Rectangle(d.x, d.y, d.ancho, d.alto).overlaps(hitRancor)) {
-                rancor.recibirDanio(jugador.getAtaque());
-                it.remove();
+            float dw = salaFinal ? 16 : 8;
+            float dh = salaFinal ? 16 : 8;
+            batch.draw(disparoTexture, d.x, d.y, dw, dh);
+
+            if (salaB) {
+                Rectangle hitRancor = new Rectangle(rancor.getX(), rancor.getY(), rancor.getWidth(), rancor.getHeight());
+                if (new Rectangle(d.x, d.y, d.ancho, d.alto).overlaps(hitRancor)) {
+                    rancor.recibirDanio(jugador.getAtaque());
+                    it.remove();
+                }
             }
+
+            if (salaFinal && dragon != null && !dragon.estaMuerto()) {
+                Rectangle hitDragon = dragon.getRectangulo();
+                if (new Rectangle(d.x, d.y, d.ancho, d.alto).overlaps(hitDragon)) {
+                    dragon.recibirDanio(jugador.getAtaque() * 2);
+                    it.remove();
+                }
+            }
+
             if (d.x < 0 || d.x > 800 || d.y < 0 || d.y > 600) {
                 it.remove();
             }
         }
 
         jugador.dibujar(batch);
+
+        if (salaFinal && dragon != null) {
+            dragon.actualizar(delta, jugador);
+            dragon.dibujar(batch);
+
+            for (DisparoFuego fuego : dragon.getFuegos()) {
+                batch.draw(disparoTexture, fuego.x, fuego.y, 16, 16);
+                if (jugador.getRectangulo().overlaps(fuego.getRectangulo())) {
+                    jugador.setVida(0); // muerte instantánea
+                }
+            }
+
+            // Cambiar a pantalla de victoria si ha muerto
+            if (dragon.estaMuerto() && dragon.enSegundaFase()) {
+                game.setScreen(new VictoriaScreen(game));
+            }
+        }
+
 
         if (salaB) {
             Rectangle hitJugador = jugador.getRectangulo();
@@ -179,6 +212,18 @@ public class GameScreen implements Screen {
                 salaFinal = true;
                 fondo1 = fondoFinal;
                 fondo2 = fondoFinal;
+                dragon = new EnemigoFinal(480, 280, 100, 400,
+                    new Texture("dragon_sin_right.png"),
+                    new Texture("dragon_sin_left.png"),
+                    new Texture("dragon_dead.png"));
+                paredes.clear();
+                columnas.clear();
+                paredes.addAll(
+                    new Polygon(new float[]{20, 600, 20, 0, 20, 0, 20, 600}),
+                    new Polygon(new float[]{748, 600, 748, 0, 748, 0, 748, 600}),
+                    new Polygon(new float[]{0, 120, 748, 120, 748, 120, 0, 120}),
+                    new Polygon(new float[]{0, 600, 748, 600, 748, 600, 0, 600})
+                );
             }
         }
 
@@ -190,8 +235,6 @@ public class GameScreen implements Screen {
                 salaB = true;
                 fondo1 = fondo3;
                 fondo2 = fondo3;
-                //portal = null;
-                //portal2 = null;
                 paredes.clear();
                 columnas.clear();
                 paredes.addAll(
@@ -212,7 +255,10 @@ public class GameScreen implements Screen {
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         new BarraVida(jugador.getVida(), jugador.getMaxVida(), 20, 20, 200, 20, Color.RED).dibujar(shapeRenderer);
-        new BarraVida(rancor.getVida(), rancor.getMaxVida(), 580, 20, 200, 20, Color.PURPLE).dibujar(shapeRenderer);
+        if (salaB)
+            new BarraVida(rancor.getVida(), rancor.getMaxVida(), 580, 20, 200, 20, Color.PURPLE).dibujar(shapeRenderer);
+        if (salaFinal && dragon != null)
+            new BarraVida(dragon.getVida(), dragon.getMaxVida(), 500, 20, 200, 20, Color.ORANGE).dibujar(shapeRenderer);
         shapeRenderer.end();
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
@@ -239,6 +285,7 @@ public class GameScreen implements Screen {
         loadingTexture.dispose();
         jugador.dispose();
         rancor.dispose();
+        if (dragon != null) dragon.dispose();
         disparoTexture.dispose();
         if (portal != null) portal.dispose();
         if (portal2 != null) portal2.dispose();
