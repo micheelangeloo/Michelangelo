@@ -11,7 +11,7 @@ public class GameOverScreen implements Screen {
     Texture gameOverImage;
     BitmapFont font;
 
-    public GameOverScreen(Main game) {
+    public GameOverScreen(Main game)                       {
         this.game = game;
     }
 
