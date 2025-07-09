@@ -5,3 +5,5 @@ Confía en el proceso: cada etapa está diseñada para entregar soluciones de ca
 💸💰📈Especialización en Criptoinversión y Gestión de Activos Digitales
 
 👨🏻‍🎓👨🏻‍💻🎖️Estudiante de Desarrollo de Aplicaciones WEB
+
+👨🏻‍🎓🌟 Título de Bachillerato en Ciencias y Tecnología
